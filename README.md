@@ -1,12 +1,12 @@
 # Portfolio (Cloudflare Workers)
 
-A minimal, data-driven personal portfolio site served by a Cloudflare Worker.
+A minimal personal portfolio site served by a Cloudflare Worker.
 
 ## Overview
 
 This project combines:
 
-- **Static frontend assets** in `public/` (HTML/CSS/JS and JSON content).
+- **Static frontend assets** in `public/` (HTML, CSS, JavaScript, and images).
 - **A Worker backend** in `src/worker.js` for dynamic stats and visit tracking.
 - **Cloudflare D1** for visitor analytics storage.
 
@@ -16,9 +16,8 @@ At runtime, the Worker serves static files through the `ASSETS` binding and expo
 
 ### Frontend (`public/`)
 
-- `index.html` defines section containers (education, experience, stats, projects, leadership, contact).
-- `public/js/main.js` initializes theme, entries, remote stats, visit tracking, GitHub heatmap, and interactive globe.
-- Content is loaded from JSON files (`education.json`, `experience.json`, `projects.json`, etc.) and rendered client-side.
+- `public/index.html` contains the semantic portfolio content.
+- `public/js/main.js` initializes theme, remote stats, visit tracking, and the interactive globe.
 
 ### Backend (`src/worker.js`)
 
@@ -32,8 +31,9 @@ All non-API requests are forwarded to static assets via `env.ASSETS.fetch(reques
 
 ### Data layer (D1)
 
-- SQL schema lives in `migrations/0001_visits.sql`.
-- `visits` stores timestamp, path, IP, and location fields used for aggregate analytics and globe markers.
+- SQL schema changes live in `migrations/`.
+- `visits` preserves timestamp, path, IP, and location history.
+- Trigger-maintained aggregate tables make visit counts and globe markers constant-cost to query.
 
 ## Configuration
 
@@ -49,7 +49,7 @@ All non-API requests are forwarded to static assets via `env.ASSETS.fetch(reques
 
 ### Prerequisites
 
-- Node.js (for build script tooling)
+- Node.js 22 or newer
 - Wrangler CLI
 - Cloudflare account/project setup
 
@@ -57,16 +57,79 @@ All non-API requests are forwarded to static assets via `env.ASSETS.fetch(reques
 
 ```bash
 npm install
-npx wrangler dev
+npm run db:migrate:local
+npm run dev
 ```
 
 If this repository is used without a full npm setup, run Wrangler directly as configured in your environment.
 
-## Deploy
+## Database migration and deploy
 
-```bash
-npx wrangler deploy
-```
+Run these commands from the repository root. Apply the D1 migration before deploying the updated Worker.
+
+1. Confirm Node.js 22+ is active and Wrangler is signed in to the Cloudflare account that owns `portfolio-visits`:
+
+   ```bash
+   node --version
+   npx wrangler --version
+   npx wrangler whoami
+   ```
+
+   If needed, sign in with `npx wrangler login` and rerun `whoami`.
+
+2. Confirm the production database identity and save the Time Travel bookmark printed by the second command as a recovery point:
+
+   ```bash
+   npx wrangler d1 info portfolio-visits
+   npx wrangler d1 time-travel info portfolio-visits
+   ```
+
+   The database ID must match `wrangler.toml` before continuing.
+
+3. List the unapplied production migrations. For the existing portfolio database, this should show only `0002_aggregate_visits.sql`:
+
+   ```bash
+   npx wrangler d1 migrations list portfolio-visits --remote
+   ```
+
+   Stop if `0001_visits.sql` or any unexpected migration appears.
+
+4. Apply the pending migration. Confirm the prompt only after checking that the target is the remote `portfolio-visits` database and the list contains exactly `0002_aggregate_visits.sql`:
+
+   ```bash
+   npx wrangler d1 migrations apply portfolio-visits --remote
+   ```
+
+   Wrangler creates a backup first and rolls back the failing migration if an error occurs.
+
+5. Verify that no migrations remain and that every aggregate matches the preserved raw visits:
+
+   ```bash
+   npx wrangler d1 migrations list portfolio-visits --remote
+   npx wrangler d1 execute portfolio-visits --remote --command "
+   SELECT
+     (SELECT total_visits FROM visit_totals WHERE id = 1) =
+       (SELECT COUNT(*) FROM visits) AS totals_match,
+     (SELECT unique_visitors FROM visit_totals WHERE id = 1) =
+       (SELECT COUNT(DISTINCT CASE
+          WHEN ip IS NOT NULL AND ip != '' THEN ip
+        END) FROM visits) AS unique_match,
+     (SELECT COALESCE(SUM(visit_count), 0) FROM visit_locations) =
+       (SELECT COUNT(*) FROM visits
+        WHERE typeof(lat) IN ('integer', 'real')
+          AND typeof(lon) IN ('integer', 'real')
+          AND lat BETWEEN -90 AND 90
+          AND lon BETWEEN -180 AND 180) AS locations_match;
+   "
+   ```
+
+   The migration list should say `No migrations to apply`, and all three verification values should be `1`.
+
+6. Deploy only after the checks above succeed:
+
+   ```bash
+   npm run deploy
+   ```
 
 ## Notes
 
