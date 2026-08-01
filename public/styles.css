@@ -688,7 +688,7 @@ body.is-globe-dragging * {
   }
 
   .hero-globe-wrap.is-zoomed .hero-globe-frame {
-    margin-bottom: calc((var(--globe-zoom-scale) - 1) * 100%);
+    margin-bottom: var(--globe-zoom-offset, 0px);
   }
 
   .lower-layout {

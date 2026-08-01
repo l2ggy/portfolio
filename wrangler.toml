@@ -1,3 +1,4 @@
+name = "portfolio"
 main = "src/worker.js"
 compatibility_date = "2026-04-11"
 
