@@ -401,8 +401,8 @@ body.is-globe-dragging * {
   --hero-letter-tilt: calc(var(--hero-letter-seed) * 7deg);
   display: inline-block;
   transform: translateY(0) rotate(0deg);
-  transition: transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition-delay: calc(var(--hero-letter-stagger, var(--hero-letter-i)) * 18ms);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--hero-letter-i) * 14ms);
 }
 
 #hero-name.hero-name-animate .hero-letter {

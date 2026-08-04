@@ -30,22 +30,22 @@ export const splitHeroNameLetters = () => {
     const span = document.createElement("span");
     span.className = "hero-letter";
     span.style.setProperty("--hero-letter-i", index);
-    span.style.setProperty("--hero-letter-stagger", String(index));
     span.textContent = segment === " " ? "\u00A0" : segment;
     span.setAttribute("aria-hidden", "true");
     return span;
   });
-  const plainResetDurationMs = 320 + letterSpans.length * 18;
+  const plainResetDurationMs = 420 + letterSpans.length * 14;
   let plainResetTimeoutId = null;
+  let isScatterActive = false;
 
   const randomizeHeroLetters = () => {
     letterSpans.forEach((span) => {
       span.style.setProperty("--hero-letter-seed", (Math.random() * 2 - 1).toFixed(3));
-      span.style.setProperty("--hero-letter-stagger", String(Math.floor(Math.random() * letterSpans.length)));
     });
   };
 
   const showPlainName = () => {
+    isScatterActive = false;
     if (!heroName.classList.contains("hero-name-split")) {
       heroName.classList.remove("hero-name-animate");
       return;
@@ -63,30 +63,53 @@ export const splitHeroNameLetters = () => {
   };
 
   const showAnimatedName = () => {
+    if (isScatterActive) {
+      return;
+    }
+    isScatterActive = true;
     if (plainResetTimeoutId) {
       window.clearTimeout(plainResetTimeoutId);
       plainResetTimeoutId = null;
     }
     randomizeHeroLetters();
-    heroName.classList.remove("hero-name-animate");
-    heroName.classList.add("hero-name-split");
-    heroName.setAttribute("aria-label", originalText);
-    heroName.textContent = "";
-    letterSpans.forEach((span) => heroName.append(span));
-    requestAnimationFrame(() => heroName.classList.add("hero-name-animate"));
+    if (!heroName.classList.contains("hero-name-split")) {
+      heroName.classList.add("hero-name-split");
+      heroName.setAttribute("aria-label", originalText);
+      heroName.textContent = "";
+      letterSpans.forEach((span) => heroName.append(span));
+    }
+    void heroName.offsetWidth;
+    heroName.classList.add("hero-name-animate");
   };
 
   const supportsHoverCursor = window.matchMedia("(any-hover: hover) and (any-pointer: fine)").matches;
+  const activeInputs = new Set();
+  const syncAnimatedName = (event) => {
+    const isPointerEvent = event.type.startsWith("pointer");
+    if (isPointerEvent && event.pointerType !== "mouse") {
+      return;
+    }
+    const input = isPointerEvent ? "pointer" : "focus";
+    const isActive = event.type === "pointerenter" || (event.type === "focusin" && heroName.matches(":focus-visible"));
+    if (isActive) {
+      activeInputs.add(input);
+    } else {
+      activeInputs.delete(input);
+    }
+    if (activeInputs.size) {
+      showAnimatedName();
+    } else {
+      showPlainName();
+    }
+  };
 
-  let isAnimated = false;
   let lastPointerType = "";
   const toggleAnimatedName = () => {
-    if (isAnimated) {
+    if (isScatterActive) {
       showPlainName();
     } else {
       showAnimatedName();
     }
-    isAnimated = !isAnimated;
   };
 
   heroName.addEventListener("pointerdown", (event) => {
@@ -97,14 +120,17 @@ export const splitHeroNameLetters = () => {
     if (supportsHoverCursor && lastPointerType !== "touch" && lastPointerType !== "pen") {
       return;
     }
+    if (activeInputs.size) {
+      return;
+    }
     toggleAnimatedName();
   });
 
   if (supportsHoverCursor) {
     showPlainName();
-    heroName.addEventListener("pointerenter", showAnimatedName);
-    heroName.addEventListener("focusin", showAnimatedName);
-    heroName.addEventListener("pointerleave", showPlainName);
-    heroName.addEventListener("focusout", showPlainName);
+    heroName.addEventListener("pointerenter", syncAnimatedName);
+    heroName.addEventListener("focusin", syncAnimatedName);
+    heroName.addEventListener("pointerleave", syncAnimatedName);
+    heroName.addEventListener("focusout", syncAnimatedName);
   }
 };
