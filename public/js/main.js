@@ -3,26 +3,82 @@ import { setupInteractiveGlobe } from "./interactive-globe.js";
 import { setupStats } from "./stats.js";
 import { setupTheme } from "./theme.js";
 
-const initEntryTapIndentation = () => {
-  if (!window.matchMedia("(hover: none)").matches) {
-    return;
-  }
+const initEntryInteractions = (setColorScheme) => {
+  const tapIndentationQuery = window.matchMedia("(hover: none)");
+  const toggleEntry = (entry) => {
+    const activeEntry = document.querySelector(".subsection-item.is-active");
+    const nextEntry = entry === activeEntry ? null : entry;
+
+    activeEntry?.classList.remove("is-active");
+    activeEntry?.querySelector(".entry-theme-toggle")?.setAttribute("aria-pressed", "false");
+    if (nextEntry) {
+      nextEntry.classList.add("is-active");
+      nextEntry.querySelector(".entry-theme-toggle")?.setAttribute("aria-pressed", "true");
+    }
+
+    setColorScheme(nextEntry?.dataset.colorScheme || null);
+  };
 
   document.addEventListener("click", (event) => {
     const entry = event.target.closest(".subsection-item");
-    const activeEntry = document.querySelector(".subsection-item.is-tapped");
+    toggleEntry(entry && (tapIndentationQuery.matches || entry.dataset.colorScheme) ? entry : null);
+  });
+};
 
-    if (!entry) {
-      activeEntry?.classList.remove("is-tapped");
+const initHeatmapAccent = () => {
+  const heatmap = document.querySelector("#github-heatmap");
+  if (!heatmap) {
+    return;
+  }
+
+  const root = document.documentElement;
+  const heatmapWrap = heatmap.parentElement;
+  const baseUrl = new URL(heatmap.src);
+  const username = baseUrl.pathname.split("/").at(-1);
+  const heatmaps = new Map([[heatmap.src.toLowerCase(), heatmap]]);
+  let desiredSource = heatmap.src.toLowerCase();
+
+  const activate = (nextHeatmap) => {
+    heatmaps.forEach((image) => image.classList.toggle("is-active", image === nextHeatmap));
+  };
+
+  const syncAccent = () => {
+    const accent = getComputedStyle(root).getPropertyValue("--accent").trim().replace("#", "");
+    const nextUrl = new URL(baseUrl);
+    nextUrl.pathname = `/${accent}/${username}`;
+    const source = nextUrl.href.toLowerCase();
+    if (source === desiredSource) {
       return;
     }
+    desiredSource = source;
 
-    if (activeEntry && activeEntry !== entry) {
-      activeEntry.classList.remove("is-tapped");
+    const cachedHeatmap = heatmaps.get(source);
+    if (cachedHeatmap) {
+      if (cachedHeatmap.isConnected) {
+        activate(cachedHeatmap);
+      }
+      return;
     }
+    const nextHeatmap = heatmap.cloneNode();
+    nextHeatmap.classList.remove("is-active");
+    nextHeatmap.removeAttribute("id");
+    heatmaps.set(source, nextHeatmap);
+    nextHeatmap.onload = () => {
+      heatmapWrap.append(nextHeatmap);
+      if (desiredSource === source) {
+        nextHeatmap.getBoundingClientRect();
+        activate(nextHeatmap);
+      }
+    };
+    nextHeatmap.onerror = () => heatmaps.delete(source);
+    nextHeatmap.src = source;
+  };
 
-    entry.classList.toggle("is-tapped", activeEntry !== entry);
+  new MutationObserver(syncAccent).observe(root, {
+    attributes: true,
+    attributeFilter: ["data-theme", "data-color-scheme"],
   });
+  syncAccent();
 };
 
 const initMobileGlobePlacement = () => {
@@ -74,10 +130,11 @@ const updateVisitCount = (visitStats) => {
 
 document.addEventListener("DOMContentLoaded", () => {
   const visitStatsPromise = initVisitStats();
+  const setColorScheme = setupTheme();
 
-  setupTheme();
   splitHeroNameLetters();
-  initEntryTapIndentation();
+  initEntryInteractions(setColorScheme);
+  initHeatmapAccent();
   setupStats();
   initMobileGlobePlacement();
   visitStatsPromise.then(updateVisitCount);

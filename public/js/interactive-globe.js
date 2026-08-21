@@ -3,7 +3,6 @@ const BASE_FRAME_MS = 1000 / 60;
 const MAX_FRAME_STEPS = 3;
 const LAND_MASK_URL = "/data/land-mask.png";
 const HOME_MARKER = { lat: 43.65, lon: -79.38 };
-const HOME_MARKER_COLOR = "#1E3765";
 const VISITOR_MARKER_COLOR = "#B5744A";
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -124,7 +123,7 @@ const updateSphereProjection = (sphere, pitch, landMask) => {
   sphere.projectionPitch = pitch;
 };
 
-const renderMarkers = (ctx, center, radius, yaw, pitch, dpr, markers) => {
+const renderMarkers = (ctx, center, radius, yaw, pitch, dpr, markers, homeMarkerColor) => {
   const cosYaw = Math.cos(yaw);
   const sinYaw = Math.sin(yaw);
   const cosPitch = Math.cos(pitch);
@@ -150,14 +149,16 @@ const renderMarkers = (ctx, center, radius, yaw, pitch, dpr, markers) => {
     if (marker.isHome) {
       ctx.beginPath();
       ctx.arc(x, y, dot * 1.8, 0, TAU);
-      ctx.strokeStyle = `${HOME_MARKER_COLOR}b8`;
+      ctx.globalAlpha = 184 / 255;
+      ctx.strokeStyle = homeMarkerColor;
       ctx.lineWidth = Math.max(1, dpr * 0.9);
       ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     ctx.beginPath();
     ctx.arc(x, y, dot, 0, TAU);
-    ctx.fillStyle = marker.isHome ? HOME_MARKER_COLOR : VISITOR_MARKER_COLOR;
+    ctx.fillStyle = marker.isHome ? homeMarkerColor : VISITOR_MARKER_COLOR;
     ctx.fill();
 
     ctx.beginPath();
@@ -196,6 +197,7 @@ export const setupInteractiveGlobe = (markers = []) => {
   const mobileLayoutQuery = window.matchMedia("(max-width: 700px)");
   const coarsePointerQuery = window.matchMedia("(pointer: coarse)");
   const isAnimating = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const colorTransitionProperties = ["border-top-color", "outline-color", "color"];
   let yaw = -0.4;
   let pitch = 0.05;
   let velocity = 0.005;
@@ -208,6 +210,7 @@ export const setupInteractiveGlobe = (markers = []) => {
   let frameBuffer = null;
   let lineColor = "#d9dce1";
   let textColor = "#15191f";
+  let accentColor = "#1E3765";
   let isZoomed = !mobileLayoutQuery.matches;
   let isInteracting = false;
   let isVisible = false;
@@ -215,6 +218,8 @@ export const setupInteractiveGlobe = (markers = []) => {
   let frameId = null;
   let resizeFrameId = null;
   let lastFrameTime = 0;
+  let activeColorTransitions = 0;
+  let isBootstrappingColors = true;
   let pointerStartX = 0;
   let pointerStartY = 0;
   let pointerMoved = false;
@@ -285,9 +290,10 @@ export const setupInteractiveGlobe = (markers = []) => {
   };
 
   const updateColors = () => {
-    const styles = getComputedStyle(document.documentElement);
-    lineColor = styles.getPropertyValue("--line").trim();
-    textColor = styles.getPropertyValue("--text").trim();
+    const styles = getComputedStyle(globe);
+    lineColor = styles.borderTopColor;
+    textColor = styles.outlineColor;
+    accentColor = styles.color;
   };
 
   const draw = () => {
@@ -323,19 +329,23 @@ export const setupInteractiveGlobe = (markers = []) => {
       }
 
       ctx.putImageData(frameBuffer, 0, 0);
-      renderMarkers(ctx, center, radius, yaw, pitch, dpr, renderableMarkers);
+      renderMarkers(ctx, center, radius, yaw, pitch, dpr, renderableMarkers, accentColor);
     } else {
       ctx.beginPath();
       ctx.arc(center, center, radius, 0, TAU);
-      ctx.fillStyle = `${lineColor}78`;
+      ctx.globalAlpha = 0.47;
+      ctx.fillStyle = lineColor;
       ctx.fill();
+      ctx.globalAlpha = 1;
     }
 
     ctx.beginPath();
     ctx.arc(center, center, radius * 0.99, 0, TAU);
-    ctx.strokeStyle = `${textColor}55`;
+    ctx.globalAlpha = 0.33;
+    ctx.strokeStyle = textColor;
     ctx.lineWidth = Math.max(1, dpr);
     ctx.stroke();
+    ctx.globalAlpha = 1;
   };
 
   const refreshRenderScale = (scale) => {
@@ -384,6 +394,9 @@ export const setupInteractiveGlobe = (markers = []) => {
     velocity *= 0.986 ** steps;
     if (Math.abs(velocity) < 0.00035) {
       velocity = 0.00035;
+    }
+    if (isBootstrappingColors || activeColorTransitions) {
+      updateColors();
     }
     draw();
     scheduleFrame();
@@ -505,8 +518,32 @@ export const setupInteractiveGlobe = (markers = []) => {
     }
   }).observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ["data-theme"],
+    attributeFilter: ["data-theme", "data-color-scheme"],
   });
+  globe.addEventListener("transitionrun", (event) => {
+    if (colorTransitionProperties.includes(event.propertyName)) {
+      activeColorTransitions += 1;
+    }
+  });
+  const finishColorTransition = (event) => {
+    if (!colorTransitionProperties.includes(event.propertyName)) {
+      return;
+    }
+    activeColorTransitions = Math.max(0, activeColorTransitions - 1);
+    updateColors();
+    if (!isAnimating) {
+      draw();
+    }
+  };
+  globe.addEventListener("transitionend", finishColorTransition);
+  globe.addEventListener("transitioncancel", finishColorTransition);
+  window.setTimeout(() => {
+    isBootstrappingColors = false;
+    updateColors();
+    if (!isAnimating) {
+      draw();
+    }
+  }, 280);
   globe.addEventListener("pointerdown", onPointerDown);
   globe.addEventListener("pointermove", onPointerMove);
   globe.addEventListener("pointerup", onPointerUp);

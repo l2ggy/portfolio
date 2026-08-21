@@ -2,14 +2,14 @@ const storedThemeKey = "portfolio-theme-override";
 
 export const setupTheme = () => {
   const themeToggle = document.querySelector("#theme-toggle");
+  const root = document.documentElement;
   const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
-  const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   let overrideTheme = localStorage.getItem(storedThemeKey);
 
   const getSystemTheme = () => (systemThemeQuery.matches ? "dark" : "light");
 
   const applyTheme = (theme) => {
-    document.documentElement.dataset.theme = theme;
+    root.dataset.theme = theme;
     if (!themeToggle) {
       return;
     }
@@ -20,26 +20,17 @@ export const setupTheme = () => {
     themeToggle.setAttribute("title", `Switch to ${nextTheme} mode`);
   };
 
-  const canAnimateTheme = () => !reducedMotionQuery.matches && typeof document.startViewTransition === "function";
-  const setTheme = (theme) => {
-    if (!canAnimateTheme()) {
-      applyTheme(theme);
-      return;
-    }
-
-    document.startViewTransition(() => {
-      applyTheme(theme);
-    });
-  };
-
   applyTheme(overrideTheme || getSystemTheme());
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => root.classList.add("is-theme-ready"));
+  });
 
   if (themeToggle) {
     themeToggle.addEventListener("click", () => {
       const currentTheme = document.documentElement.dataset.theme || getSystemTheme();
       overrideTheme = currentTheme === "dark" ? "light" : "dark";
       localStorage.setItem(storedThemeKey, overrideTheme);
-      setTheme(overrideTheme);
+      applyTheme(overrideTheme);
     });
   }
 
@@ -51,7 +42,15 @@ export const setupTheme = () => {
     }
 
     if (!overrideTheme) {
-      setTheme(systemTheme);
+      applyTheme(systemTheme);
     }
   });
+
+  return (colorScheme) => {
+    if (colorScheme) {
+      root.dataset.colorScheme = colorScheme;
+    } else {
+      delete root.dataset.colorScheme;
+    }
+  };
 };
