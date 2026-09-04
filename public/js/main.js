@@ -1,29 +1,7 @@
 import { splitHeroNameLetters } from "./hero-name.js";
 import { setupInteractiveGlobe } from "./interactive-globe.js";
 import { setupStats } from "./stats.js";
-import { setupTheme } from "./theme.js";
-
-const initEntryTapIndentation = () => {
-  if (!window.matchMedia("(hover: none)").matches) {
-    return;
-  }
-
-  document.addEventListener("click", (event) => {
-    const entry = event.target.closest(".subsection-item");
-    const activeEntry = document.querySelector(".subsection-item.is-tapped");
-
-    if (!entry) {
-      activeEntry?.classList.remove("is-tapped");
-      return;
-    }
-
-    if (activeEntry && activeEntry !== entry) {
-      activeEntry.classList.remove("is-tapped");
-    }
-
-    entry.classList.toggle("is-tapped", activeEntry !== entry);
-  });
-};
+import { initEntryInteractions, initHeatmapAccent, setupTheme } from "./theme.js";
 
 const initMobileGlobePlacement = () => {
   const media = window.matchMedia("(max-width: 700px)");
@@ -74,10 +52,11 @@ const updateVisitCount = (visitStats) => {
 
 document.addEventListener("DOMContentLoaded", () => {
   const visitStatsPromise = initVisitStats();
+  const setColorScheme = setupTheme();
 
-  setupTheme();
   splitHeroNameLetters();
-  initEntryTapIndentation();
+  initEntryInteractions(setColorScheme);
+  initHeatmapAccent();
   setupStats();
   initMobileGlobePlacement();
   visitStatsPromise.then(updateVisitCount);
