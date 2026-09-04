@@ -1,4 +1,5 @@
 :root {
+  --theme-duration: 280ms;
   --header-h: 48px;
   --footer-h: 36px;
   --globe-zoom-scale: 1.85;
@@ -15,6 +16,7 @@
   --bar-active: var(--text);
   --bar-line: var(--line);
   --accent: #1e3765;
+  --heatmap-accent: #1e3765;
 }
 
 :root[data-theme="light"] {
@@ -37,18 +39,20 @@
 :root[data-color-scheme="amazon"] {
   --bar-bg: #232f3e;
   --bar-line: #ff9900;
+  --heatmap-accent: #663d00;
 }
 
 :root[data-color-scheme="helmholtz"] {
   --bar-bg: #69005f;
   --bar-line: #ff506e;
+  --heatmap-accent: #490043;
 }
 
 :root[data-theme="dark"][data-color-scheme="uoft"] {
   --bg: #101722;
   --text: #f6f6f9;
   --muted: #aab4c0;
-  --line: #68788b;
+  --line: #303d50;
   --accent: #6fc7ea;
 }
 
@@ -64,7 +68,7 @@
   --bg: #0f141a;
   --text: #f3f3f3;
   --muted: #c2c7d0;
-  --line: #71747a;
+  --line: #35404e;
   --accent: #ff9900;
 }
 
@@ -80,7 +84,7 @@
   --bg: #111111;
   --text: #ffffff;
   --muted: #a5a5a5;
-  --line: #666666;
+  --line: #393139;
   --accent: #ff506e;
 }
 
@@ -94,7 +98,7 @@
 
 :where(:root.is-theme-ready) :where(body, body *, body *::before, body *::after) {
   transition-property: color, background-color, border-color, outline-color, fill, stroke;
-  transition-duration: 280ms;
+  transition-duration: var(--theme-duration);
   transition-timing-function: ease;
 }
 
@@ -203,7 +207,7 @@ button {
 
 .text-btn {
   position: relative;
-  transition: color 280ms ease, transform 180ms ease;
+  transition: color var(--theme-duration) ease, transform 180ms ease;
 }
 
 .text-btn::after {
@@ -216,7 +220,7 @@ button {
   background: var(--bar-active);
   transform: scaleX(0);
   transform-origin: left center;
-  transition: background-color 280ms ease, transform 180ms ease;
+  transition: background-color var(--theme-duration) ease, transform 180ms ease;
 }
 
 .text-btn:hover,
@@ -401,9 +405,9 @@ button {
   border-top-color: var(--line);
   outline-color: var(--text);
   transition:
-    color 280ms ease,
-    border-top-color 280ms ease,
-    outline-color 280ms ease,
+    color var(--theme-duration) ease,
+    border-top-color var(--theme-duration) ease,
+    outline-color var(--theme-duration) ease,
     width 320ms cubic-bezier(0.22, 1, 0.36, 1),
     height 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -450,7 +454,7 @@ body.is-globe-dragging * {
   height: auto;
   display: block;
   opacity: 0;
-  transition: opacity 280ms ease;
+  transition: opacity var(--theme-duration) ease;
 }
 
 .hero-heatmap.is-active {
@@ -519,6 +523,10 @@ body.is-globe-dragging * {
   outline: 2px solid var(--text);
   outline-offset: 0.15rem;
   border-radius: 8px;
+}
+
+.entry[data-color-scheme].is-active h3 {
+  color: var(--accent);
 }
 
 .subsection-item:not([data-color-scheme]):focus-within,
@@ -600,7 +608,7 @@ body.is-globe-dragging * {
 .project-title-link {
   position: relative;
   text-decoration: none;
-  transition: color 280ms ease, transform 180ms ease;
+  transition: color var(--theme-duration) ease, transform 180ms ease;
 }
 
 .project-title-link::after {
@@ -613,7 +621,7 @@ body.is-globe-dragging * {
   background: var(--text);
   transform: scaleX(0);
   transform-origin: left center;
-  transition: background-color 280ms ease, transform 180ms ease;
+  transition: background-color var(--theme-duration) ease, transform 180ms ease;
 }
 
 .project-title-link:hover,
@@ -847,6 +855,18 @@ body.is-globe-dragging * {
     flex-direction: column;
     gap: 0.2rem;
     padding-block: 0.2rem;
+  }
+
+  .footer-links {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.35rem;
+  }
+
+  .footer-links .text-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
   }
 
   .hero h1 {

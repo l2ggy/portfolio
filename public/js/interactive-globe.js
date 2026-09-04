@@ -290,6 +290,7 @@ export const setupInteractiveGlobe = (markers = []) => {
   };
 
   const updateColors = () => {
+    // Read interpolated CSS colors so the canvas follows interrupted theme transitions.
     const styles = getComputedStyle(globe);
     lineColor = styles.borderTopColor;
     textColor = styles.outlineColor;
@@ -543,7 +544,7 @@ export const setupInteractiveGlobe = (markers = []) => {
     if (!isAnimating) {
       draw();
     }
-  }, 280);
+  }, Number.parseFloat(getComputedStyle(globe).getPropertyValue("--theme-duration")));
   globe.addEventListener("pointerdown", onPointerDown);
   globe.addEventListener("pointermove", onPointerMove);
   globe.addEventListener("pointerup", onPointerUp);
