@@ -1,5 +1,7 @@
 import { splitHeroNameLetters } from "./hero-name.js";
-import { setupInteractiveGlobe } from "./interactive-globe.js";
+import { setupInteractiveGlobe } from "./interactive-globe.js?v=20260904";
+import { setupDetails } from "./easter-eggs/details.js?v=20260904";
+import { setupStatsEggs } from "./easter-eggs/stats.js?v=20260904";
 import { setupStats } from "./stats.js";
 import { initEntryInteractions, initHeatmapAccent, setupTheme } from "./theme.js";
 
@@ -59,6 +61,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initHeatmapAccent();
   setupStats();
   initMobileGlobePlacement();
+  setupDetails();
+  setupStatsEggs();
   visitStatsPromise.then(updateVisitCount);
   visitStatsPromise.then((visitStats) => {
     setupInteractiveGlobe(visitStats?.locations || []);

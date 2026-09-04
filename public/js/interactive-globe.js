@@ -53,6 +53,74 @@ const geoToVector = (lat, lon) => {
   return [cosLat * Math.cos(lonRad), Math.sin(latRad), -cosLat * Math.sin(lonRad)];
 };
 
+export const rotateGlobeVector = ([x, y, z], yaw, pitch) => {
+  const depth = -x * Math.sin(yaw) + z * Math.cos(yaw);
+  return [x * Math.cos(yaw) + z * Math.sin(yaw), y * Math.cos(pitch) - depth * Math.sin(pitch), y * Math.sin(pitch) + depth * Math.cos(pitch)];
+};
+
+const orbitPoint = (angle, index) => {
+  const tilt = (index - 1.5) * 0.63;
+  return rotateGlobeVector([Math.cos(angle), Math.sin(angle), 0], index * 0.71, tilt);
+};
+const createMathGeometry = () => ({
+  wireframe: [
+    ...Array.from({ length: 5 }, (_, i) => Array.from({ length: 121 }, (_, j) => geoToVector(i * 30 - 60, j * 3))),
+    ...Array.from({ length: 12 }, (_, i) => Array.from({ length: 61 }, (_, j) => geoToVector(j * 3 - 90, i * 30))),
+  ],
+  points: Array.from({ length: 1100 }, (_, i) => {
+    const y = 1 - 2 * (i + 0.5) / 1100;
+    const angle = i * Math.PI * (3 - Math.sqrt(5));
+    const radius = Math.sqrt(1 - y * y);
+    return [Math.cos(angle) * radius, y, Math.sin(angle) * radius];
+  }),
+  orbits: Array.from({ length: 5 }, (_, i) => Array.from({ length: 181 }, (_, j) => orbitPoint(j * TAU / 180, i))),
+});
+const renderMathematicalGlobe = (ctx, sphere, yaw, pitch, mode, geometry, color, phase, dpr) => {
+  const { center, radius } = sphere;
+  const cosYaw = Math.cos(yaw);
+  const sinYaw = Math.sin(yaw);
+  const cosPitch = Math.cos(pitch);
+  const sinPitch = Math.sin(pitch);
+  const project = ([x, y, z]) => {
+    const depth = -x * sinYaw + z * cosYaw;
+    return [x * cosYaw + z * sinYaw, y * cosPitch - depth * sinPitch, y * sinPitch + depth * cosPitch];
+  };
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(0.7, dpr * 0.65);
+  if (mode === "points") {
+    for (const vector of geometry.points) {
+      const [x, y, z] = project(vector);
+      ctx.globalAlpha = z < 0 ? 0.09 : 0.28 + 0.65 * z;
+      ctx.beginPath();
+      ctx.arc(center + x * radius, center - y * radius, dpr * (z < 0 ? 0.65 : 0.8 + z * 0.65), 0, TAU);
+      ctx.fill();
+    }
+  } else {
+    for (const line of geometry[mode]) {
+      for (let i = 1; i < line.length; i += 1) {
+        const a = project(line[i - 1]);
+        const b = project(line[i]);
+        ctx.globalAlpha = b[2] < 0 ? 0.10 : 0.35 + 0.5 * b[2];
+        ctx.beginPath();
+        ctx.moveTo(center + a[0] * radius, center - a[1] * radius);
+        ctx.lineTo(center + b[0] * radius, center - b[1] * radius);
+        ctx.stroke();
+      }
+    }
+    if (mode === "orbits") {
+      for (let i = 0; i < 5; i += 1) {
+        const [x, y, z] = project(orbitPoint(phase * (0.2 + i * 0.03) + i * 1.7, i));
+        ctx.globalAlpha = z < 0 ? 0.2 : 1;
+        ctx.beginPath();
+        ctx.arc(center + x * radius, center - y * radius, dpr * 2.4, 0, TAU);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+};
+
 const buildSphereSamples = (size) => {
   const center = size * 0.5;
   const radius = size * 0.44;
@@ -196,7 +264,8 @@ export const setupInteractiveGlobe = (markers = []) => {
 
   const mobileLayoutQuery = window.matchMedia("(max-width: 700px)");
   const coarsePointerQuery = window.matchMedia("(pointer: coarse)");
-  const isAnimating = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let isAnimating = !reducedMotionQuery.matches;
   const colorTransitionProperties = ["border-top-color", "outline-color", "color"];
   let yaw = -0.4;
   let pitch = 0.05;
@@ -223,13 +292,17 @@ export const setupInteractiveGlobe = (markers = []) => {
   let pointerStartX = 0;
   let pointerStartY = 0;
   let pointerMoved = false;
+  const modes = ["earth", "wireframe", "points", "orbits"];
+  let mode = "earth";
+  let mathGeometry = null;
+  let currentPhase = 0;
 
   const getZoomScale = () => {
     const raw = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--globe-zoom-scale"));
     const preferred = Number.isFinite(raw) && raw > 1 ? raw : 1.85;
     const frameRect = globeFrame.getBoundingClientRect();
     const layoutRect = lowerLayout.getBoundingClientRect();
-    const frameSize = globeWrap.clientWidth || globeFrame.clientWidth || 1;
+    const frameSize = frameRect.width || 1;
     const reservedHeight = mobileLayoutQuery.matches
       ? Number.parseFloat(getComputedStyle(globeFrame).marginBottom) || 0
       : 0;
@@ -302,8 +375,14 @@ export const setupInteractiveGlobe = (markers = []) => {
       return;
     }
 
+    yaw = ((yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
     const { size, center, radius, count, pixelIndices, maskU, maskRows } = sphere;
     ctx.clearRect(0, 0, size, size);
+
+    if (mode !== "earth") {
+      renderMathematicalGlobe(ctx, sphere, yaw, pitch, mode, mathGeometry, textColor, currentPhase, dpr);
+      return;
+    }
 
     if (landMask && frameBuffer) {
       if (sphere.projectionPitch !== pitch) {
@@ -382,7 +461,7 @@ export const setupInteractiveGlobe = (markers = []) => {
 
   const onFrame = (timestamp) => {
     frameId = null;
-    if (!isVisible || document.hidden) {
+    if (!isAnimating || !isVisible || document.hidden) {
       lastFrameTime = 0;
       return;
     }
@@ -390,11 +469,12 @@ export const setupInteractiveGlobe = (markers = []) => {
     const elapsed = lastFrameTime ? timestamp - lastFrameTime : 0;
     const steps = Math.min(elapsed / BASE_FRAME_MS, MAX_FRAME_STEPS);
     lastFrameTime = timestamp;
-    yaw += velocity * steps;
-    yaw = ((yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
-    velocity *= 0.986 ** steps;
-    if (Math.abs(velocity) < 0.00035) {
-      velocity = 0.00035;
+    currentPhase += steps * BASE_FRAME_MS / 1000;
+    if (pointerId === null) {
+      yaw += velocity * steps;
+      velocity *= 0.986 ** steps;
+      const minimumVelocity = mode === "earth" ? 0.00035 : 0.0008;
+      if (Math.abs(velocity) < minimumVelocity) velocity = minimumVelocity;
     }
     if (isBootstrappingColors || activeColorTransitions) {
       updateColors();
@@ -404,7 +484,9 @@ export const setupInteractiveGlobe = (markers = []) => {
   };
 
   const onPointerDown = (event) => {
+    if (event.button !== 0 || pointerId !== null) return;
     event.preventDefault();
+    globe.focus({ preventScroll: true });
     pointerId = event.pointerId;
     previousX = event.clientX;
     previousY = event.clientY;
@@ -417,6 +499,7 @@ export const setupInteractiveGlobe = (markers = []) => {
       window.clearTimeout(settleTimer);
       settleTimer = null;
     }
+    scheduleFrame();
     refreshRenderScale(isZoomed ? getZoomScale() : 1);
     document.body.classList.add("is-globe-dragging");
     globe.setPointerCapture(event.pointerId);
@@ -441,9 +524,7 @@ export const setupInteractiveGlobe = (markers = []) => {
     yaw += deltaX * 0.012 * dragScale;
     pitch = clamp(pitch + deltaY * 0.008 * dragScale, -1.3, 1.3);
     velocity = deltaX * 0.00075 * dragScale;
-    if (!isAnimating) {
-      draw();
-    }
+    if (!isAnimating) draw();
   };
 
   const onPointerUp = (event) => {
@@ -452,8 +533,8 @@ export const setupInteractiveGlobe = (markers = []) => {
     }
     pointerId = null;
     document.body.classList.remove("is-globe-dragging");
-    globe.releasePointerCapture(event.pointerId);
-    if (!pointerMoved && mobileLayoutQuery.matches) {
+    if (globe.hasPointerCapture(event.pointerId)) globe.releasePointerCapture(event.pointerId);
+    if (event.type === "pointerup" && !pointerMoved && mobileLayoutQuery.matches) {
       isZoomed = !isZoomed;
       const nextScale = isZoomed ? getZoomScale() : 1;
       applyGlobeScale(nextScale);
@@ -463,6 +544,16 @@ export const setupInteractiveGlobe = (markers = []) => {
     }
     scheduleIdleQuality(isZoomed ? getZoomScale() : 1);
   };
+
+  const selectMode = (nextMode) => {
+    mode = nextMode;
+    if (mode !== "earth") mathGeometry ??= createMathGeometry();
+    globe.setAttribute("aria-label", `${mode} globe. Double-click or press M to change form; arrow keys rotate; Escape returns to Earth.`);
+    draw();
+    scheduleFrame();
+  };
+  globe.tabIndex = 0;
+  selectMode("earth");
 
   const start = () => {
     const initialScale = isZoomed ? getZoomScale() : 1;
@@ -502,6 +593,10 @@ export const setupInteractiveGlobe = (markers = []) => {
       }
       const nextScale = isZoomed ? getZoomScale() : 1;
       applyGlobeScale(nextScale);
+      // Responsive layout changes must fit immediately; only tap-to-zoom should animate size.
+      for (const animation of globe.getAnimations()) {
+        if (["width", "height"].includes(animation.transitionProperty)) animation.finish();
+      }
       refreshRenderScale(nextScale);
     });
   });
@@ -511,6 +606,12 @@ export const setupInteractiveGlobe = (markers = []) => {
     } else {
       scheduleFrame();
     }
+  });
+  reducedMotionQuery.addEventListener("change", () => {
+    isAnimating = !reducedMotionQuery.matches;
+    if (isAnimating) scheduleFrame();
+    else stopAnimation();
+    refreshRenderScale(isZoomed ? getZoomScale() : 1);
   });
   new MutationObserver(() => {
     updateColors();
@@ -524,6 +625,7 @@ export const setupInteractiveGlobe = (markers = []) => {
   globe.addEventListener("transitionrun", (event) => {
     if (colorTransitionProperties.includes(event.propertyName)) {
       activeColorTransitions += 1;
+      scheduleFrame();
     }
   });
   const finishColorTransition = (event) => {
@@ -549,5 +651,27 @@ export const setupInteractiveGlobe = (markers = []) => {
   globe.addEventListener("pointermove", onPointerMove);
   globe.addEventListener("pointerup", onPointerUp);
   globe.addEventListener("pointercancel", onPointerUp);
+  globe.addEventListener("lostpointercapture", onPointerUp);
   globe.addEventListener("dragstart", (event) => event.preventDefault());
+  globe.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    selectMode(modes[(modes.indexOf(mode) + 1) % modes.length]);
+  });
+  globe.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key.toLowerCase() === "m" || event.key === "Escape") {
+      event.preventDefault();
+      if (!event.repeat) selectMode(event.key === "Escape" ? "earth" : modes[(modes.indexOf(mode) + 1) % modes.length]);
+      return;
+    }
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    velocity = 0;
+    if (event.key === "ArrowLeft") yaw -= 0.15;
+    if (event.key === "ArrowRight") yaw += 0.15;
+    if (event.key === "ArrowUp") pitch -= 0.12;
+    if (event.key === "ArrowDown") pitch += 0.12;
+    pitch = clamp(pitch, -1.3, 1.3);
+    draw();
+  });
 };

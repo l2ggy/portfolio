@@ -10,7 +10,7 @@ This project combines:
 - **A Worker backend** in `src/worker.js` for dynamic stats and visit tracking.
 - **Cloudflare D1** for visitor analytics storage.
 
-At runtime, the Worker serves static files through the `ASSETS` binding and exposes lightweight JSON APIs under `/api/*`.
+At runtime, the Worker serves static files through the `ASSETS` binding and exposes lightweight APIs under `/api/*`.
 
 ## Architecture
 
@@ -21,11 +21,12 @@ At runtime, the Worker serves static files through the `ASSETS` binding and expo
 
 ### Backend (`src/worker.js`)
 
-The Worker provides three API routes:
+The Worker provides four API routes:
 
 - `POST /api/visit` — records a page visit (path + geo/IP metadata from Cloudflare request context).
 - `GET /api/visit-stats` — returns total visits, unique visitors, and aggregated map points.
 - `GET /api/stats` — fetches LeetCode + Monkeytype stats and returns a unified payload.
+- `GET /api/contributions` — reads the current GitHub contribution graph for the Game of Life; caches successful results for 24 hours.
 
 All non-API requests are forwarded to static assets via `env.ASSETS.fetch(request)`.
 
@@ -62,6 +63,20 @@ npm run dev
 ```
 
 If this repository is used without a full npm setup, run Wrangler directly as configured in your environment.
+
+### Easter eggs
+
+The normal page includes five small interactions:
+
+- Click the contribution graph to start Game of Life; click again or press Escape to restore it.
+- Click the WPM chip to race the displayed personal best; Escape or clicking outside closes it.
+- Double-click the globe or focus it and press M to cycle Earth, wireframe, points, and orbits. Arrow keys rotate; Escape restores Earth.
+- Hover or focus the wordmark for a brief lag animation.
+- Hover, focus, or hold the maple leaf for five uninterrupted seconds to release it. A normal click still opens the webring.
+
+All effects respect reduced motion and stop when the page is hidden. Life loads current contribution cells only when activated; unavailable data leaves the original graph intact. No preview controls or fixed data snapshots are shipped.
+
+Run `npm run preview` with Node.js 22+ to test the combined site at [localhost:8787](http://localhost:8787/). This uses a separate local database and never modifies production data.
 
 ## Database migration and deploy
 

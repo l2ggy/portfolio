@@ -216,7 +216,7 @@ const getStats = async (requestUrl) => {
   };
 };
 
-const getStatsResponse = async (request, requestUrl, ctx) => {
+const getCachedResponse = async (request, ctx, load) => {
   const cache = globalThis.caches?.default;
   if (cache) {
     try {
@@ -229,12 +229,8 @@ const getStatsResponse = async (request, requestUrl, ctx) => {
     }
   }
 
-  const { complete, payload } = await getStats(requestUrl);
-  const response = jsonResponse(payload, {
-    headers: complete ? { "cache-control": STATS_CACHE_CONTROL } : noStore,
-  });
-
-  if (complete && cache) {
+  const response = await load();
+  if (cache && response.ok && response.headers.get("cache-control") !== "no-store") {
     const cacheWrite = cache.put(request, response.clone()).catch(() => {});
     if (ctx?.waitUntil) {
       ctx.waitUntil(cacheWrite);
@@ -245,6 +241,35 @@ const getStatsResponse = async (request, requestUrl, ctx) => {
 
   return response;
 };
+
+const getStatsResponse = (request, requestUrl, ctx) => getCachedResponse(request, ctx, async () => {
+  const { complete, payload } = await getStats(requestUrl);
+  return jsonResponse(payload, {
+    headers: complete ? { "cache-control": STATS_CACHE_CONTROL } : noStore,
+  });
+});
+
+const getContributionsResponse = (request, ctx) => getCachedResponse(request, ctx, async () => {
+  try {
+    const upstream = await fetch("https://ghchart.rshah.org/1E3765/l2ggy", {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+    if (!upstream.ok || !upstream.headers.get("content-type")?.includes("image/svg+xml")) {
+      await upstream.body?.cancel();
+      throw new Error("Contribution graph unavailable");
+    }
+    // The client extracts cell data; never serve third-party SVG as executable same-origin content.
+    return new Response(await upstream.text(), {
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "x-content-type-options": "nosniff",
+        "cache-control": "public, max-age=86400",
+      },
+    });
+  } catch {
+    return jsonResponse({ error: "Contribution graph unavailable" }, { status: 502 });
+  }
+});
 
 const methodNotAllowed = (allow) =>
   jsonResponse(
@@ -275,6 +300,13 @@ export default {
         return methodNotAllowed("GET");
       }
       return getStatsResponse(request, requestUrl, ctx);
+    }
+
+    if (requestUrl.pathname === "/api/contributions") {
+      if (request.method !== "GET") {
+        return methodNotAllowed("GET");
+      }
+      return getContributionsResponse(new Request(`${requestUrl.origin}/api/contributions`), ctx);
     }
 
     if (requestUrl.pathname === "/api" || requestUrl.pathname.startsWith("/api/")) {

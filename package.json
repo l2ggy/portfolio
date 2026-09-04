@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "wrangler dev",
+    "preview": "wrangler d1 migrations apply portfolio-visits --local --persist-to .wrangler/previews && wrangler dev --port 8787 --persist-to .wrangler/previews",
     "build": "wrangler deploy --dry-run --outdir .wrangler/dist",
     "test": "node --test",
     "check": "npm run test && npm run build",
