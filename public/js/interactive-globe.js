@@ -485,8 +485,8 @@ export const setupInteractiveGlobe = (markers = []) => {
 
   const onPointerDown = (event) => {
     if (event.button !== 0 || pointerId !== null) return;
-    event.preventDefault();
-    globe.focus({ preventScroll: true });
+    // Clear keyboard focus before the browser applies pointer focus without a ring.
+    globe.blur();
     pointerId = event.pointerId;
     previousX = event.clientX;
     previousY = event.clientY;
