@@ -249,7 +249,7 @@ const getStatsResponse = (request, requestUrl, ctx) => getCachedResponse(request
   });
 });
 
-const getContributionsResponse = (request, ctx) => getCachedResponse(request, ctx, async () => {
+const getContributionsResponse = async () => {
   try {
     const upstream = await fetch("https://ghchart.rshah.org/1E3765/l2ggy", {
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -263,13 +263,14 @@ const getContributionsResponse = (request, ctx) => getCachedResponse(request, ct
       headers: {
         "content-type": "text/plain; charset=utf-8",
         "x-content-type-options": "nosniff",
-        "cache-control": "public, max-age=86400",
+        // A separately cached board can omit the newest day shown by the image.
+        ...noStore,
       },
     });
   } catch {
     return jsonResponse({ error: "Contribution graph unavailable" }, { status: 502 });
   }
-});
+};
 
 const methodNotAllowed = (allow) =>
   jsonResponse(
@@ -306,7 +307,7 @@ export default {
       if (request.method !== "GET") {
         return methodNotAllowed("GET");
       }
-      return getContributionsResponse(new Request(`${requestUrl.origin}/api/contributions`), ctx);
+      return getContributionsResponse();
     }
 
     if (requestUrl.pathname === "/api" || requestUrl.pathname.startsWith("/api/")) {

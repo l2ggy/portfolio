@@ -112,7 +112,7 @@ function setupLife() {
       wrap.setAttribute("aria-busy", "true");
       const timeout = setTimeout(() => controller.abort(), 8000);
       try {
-        const response = await fetch("/api/contributions", { signal: controller.signal });
+        const response = await fetch("/api/contributions", { signal: controller.signal, cache: "no-store" });
         if (!response.ok) throw new Error("Contribution graph unavailable");
         const source = await response.text();
         if (controller.signal.aborted || document.hidden) return;

@@ -1,7 +1,7 @@
 import { splitHeroNameLetters } from "./hero-name.js";
 import { setupInteractiveGlobe } from "./interactive-globe.js?v=20260904-2";
 import { setupDetails } from "./easter-eggs/details.js?v=20260904";
-import { setupStatsEggs } from "./easter-eggs/stats.js?v=20260904";
+import { setupStatsEggs } from "./easter-eggs/stats.js?v=20260908";
 import { setupStats } from "./stats.js";
 import { initEntryInteractions, initHeatmapAccent, setupTheme } from "./theme.js";
 

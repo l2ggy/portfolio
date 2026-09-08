@@ -306,9 +306,10 @@ test("GET /api/stats does not cache a partial response", async () => {
   }
 });
 
-test("contributions use a fixed source, cache safe text, and retry failures", async (t) => {
+test("contributions use a fixed source, bypass stale boards, and retry failures", async (t) => {
   let calls = 0;
-  let cached;
+  let cacheReads = 0;
+  let cacheWrites = 0;
   let fail = false;
   t.after(setGlobal("fetch", async (url, init) => {
     calls++;
@@ -316,35 +317,33 @@ test("contributions use a fixed source, cache safe text, and retry failures", as
     assert.ok(init.signal instanceof AbortSignal);
     return fail
       ? new Response("unavailable", { status: 503 })
-      : new Response('<svg xmlns="http://www.w3.org/2000/svg"/>', { headers: { "content-type": "image/svg+xml" } });
+      : new Response(`<svg xmlns="http://www.w3.org/2000/svg" data-day="${calls}"/>`, { headers: { "content-type": "image/svg+xml" } });
   }));
   t.after(setGlobal("caches", { default: {
-    match: async () => cached?.clone(),
-    put: async (key, response) => {
-      assert.equal(key.url, "https://portfolio.example/api/contributions");
-      cached = response;
-    },
+    match: async () => { cacheReads++; return new Response("yesterday's board"); },
+    put: async () => { cacheWrites++; },
   } }));
   const request = new Request("https://portfolio.example/api/contributions?url=https://untrusted.example");
   const first = await worker.fetch(request, {});
   assert.equal(first.status, 200);
   assert.equal(first.headers.get("content-type"), "text/plain; charset=utf-8");
   assert.equal(first.headers.get("x-content-type-options"), "nosniff");
-  assert.equal(first.headers.get("cache-control"), "public, max-age=86400");
-  assert.match(await first.text(), /<svg/);
-  await worker.fetch(request, {});
-  assert.equal(calls, 1);
-  cached = undefined;
+  assert.equal(first.headers.get("cache-control"), "no-store");
+  assert.match(await first.text(), /data-day="1"/);
+  const second = await worker.fetch(request, {});
+  assert.match(await second.text(), /data-day="2"/);
+  assert.equal(calls, 2);
   fail = true;
   const failure = await worker.fetch(request, {});
   assert.equal(failure.status, 502);
   assert.equal(failure.headers.get("cache-control"), "no-store");
-  assert.equal(cached, undefined);
   fail = false;
   assert.equal((await worker.fetch(request, {})).status, 200);
-  assert.equal(calls, 3);
+  assert.equal(calls, 4);
   const post = await worker.fetch(new Request(request, { method: "POST" }), {});
   assert.equal(post.status, 405);
   assert.equal(post.headers.get("allow"), "GET");
-  assert.equal(calls, 3);
+  assert.equal(calls, 4);
+  assert.equal(cacheReads, 0);
+  assert.equal(cacheWrites, 0);
 });
