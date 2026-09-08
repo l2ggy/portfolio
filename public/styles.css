@@ -401,7 +401,7 @@ button {
   user-select: none;
   -webkit-user-drag: none;
   cursor: grab;
-  color: var(--accent);
+  color: var(--heatmap-accent);
   border-top-color: var(--line);
   outline-color: var(--text);
   transition:
@@ -636,11 +636,6 @@ body.is-globe-dragging * {
 
 .project-title-link:active {
   transform: translateY(1px);
-}
-
-.leadership-list {
-  display: grid;
-  gap: var(--space-1);
 }
 
 .leadership-item {
