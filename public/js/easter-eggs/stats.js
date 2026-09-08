@@ -104,12 +104,11 @@ function setupLife() {
     timer = setTimeout(generation >= 36 || reducedMotion() ? reset : step,
       generation >= 36 || reducedMotion() ? 1500 : 160);
   }
-  async function activate() {
-    if (generation || loading) { reset(); return; }
+  async function prepare() {
+    if (loading || document.hidden) return;
     if (!board) {
       const controller = new AbortController();
       loading = controller;
-      wrap.setAttribute("aria-busy", "true");
       const timeout = setTimeout(() => controller.abort(), 8000);
       try {
         const response = await fetch("/api/contributions", { signal: controller.signal, cache: "no-store" });
@@ -125,13 +124,24 @@ function setupLife() {
         clearTimeout(timeout);
         if (loading === controller) {
           loading = null;
-          wrap.removeAttribute("aria-busy");
+          if (!board) wrap.removeAttribute("aria-busy");
         }
       }
     }
-    cells = board.seed;
-    step();
+    if (wrap.hasAttribute("aria-busy")) {
+      wrap.removeAttribute("aria-busy");
+      cells = board.seed;
+      step();
+    }
   }
+  function activate() {
+    if (generation || wrap.hasAttribute("aria-busy")) { reset(); return; }
+    wrap.setAttribute("aria-busy", "true");
+    prepare();
+  }
+  // Prepare after the visible heatmap loads, keeping the network off the click path.
+  if (image.complete) prepare();
+  else image.addEventListener("load", prepare, { once: true });
   wrap.addEventListener("click", activate);
   wrap.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate(); }
