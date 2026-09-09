@@ -306,10 +306,10 @@ test("GET /api/stats does not cache a partial response", async () => {
   }
 });
 
-test("contributions use a fixed source, bypass stale boards, and retry failures", async (t) => {
+test("contributions share a short cache, refresh across midnight, and retry failures", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 8, 9, 23, 59) });
   let calls = 0;
-  let cacheReads = 0;
-  let cacheWrites = 0;
+  const cache = new Map([["https://portfolio.example/api/contributions", new Response("old independent board")]]);
   let fail = false;
   t.after(setGlobal("fetch", async (url, init) => {
     calls++;
@@ -320,23 +320,30 @@ test("contributions use a fixed source, bypass stale boards, and retry failures"
       : new Response(`<svg xmlns="http://www.w3.org/2000/svg" data-day="${calls}"/>`, { headers: { "content-type": "image/svg+xml" } });
   }));
   t.after(setGlobal("caches", { default: {
-    match: async () => { cacheReads++; return new Response("yesterday's board"); },
-    put: async () => { cacheWrites++; },
+    match: async (key) => cache.get(key.url)?.clone(),
+    put: async (key, response) => { cache.set(key.url, response); },
   } }));
   const request = new Request("https://portfolio.example/api/contributions?url=https://untrusted.example");
   const first = await worker.fetch(request, {});
   assert.equal(first.status, 200);
   assert.equal(first.headers.get("content-type"), "text/plain; charset=utf-8");
   assert.equal(first.headers.get("x-content-type-options"), "nosniff");
-  assert.equal(first.headers.get("cache-control"), "no-store");
+  assert.equal(first.headers.get("cache-control"), "public, max-age=300");
   assert.match(await first.text(), /data-day="1"/);
   const second = await worker.fetch(request, {});
-  assert.match(await second.text(), /data-day="2"/);
+  assert.match(await second.text(), /data-day="1"/);
+  assert.equal(calls, 1, "a warm cache avoids the upstream round trip");
+  t.mock.timers.setTime(Date.UTC(2026, 8, 10));
+  const nextDay = await worker.fetch(request, {});
+  assert.match(await nextDay.text(), /data-day="2"/);
   assert.equal(calls, 2);
+  assert.ok(cache.has("https://portfolio.example/api/contributions?snapshot=2&day=2026-09-09"));
+  cache.clear();
   fail = true;
   const failure = await worker.fetch(request, {});
   assert.equal(failure.status, 502);
   assert.equal(failure.headers.get("cache-control"), "no-store");
+  assert.equal(cache.size, 0, "failed responses must not be cached");
   fail = false;
   assert.equal((await worker.fetch(request, {})).status, 200);
   assert.equal(calls, 4);
@@ -344,6 +351,5 @@ test("contributions use a fixed source, bypass stale boards, and retry failures"
   assert.equal(post.status, 405);
   assert.equal(post.headers.get("allow"), "GET");
   assert.equal(calls, 4);
-  assert.equal(cacheReads, 0);
-  assert.equal(cacheWrites, 0);
+  assert.equal(cache.size, 1);
 });

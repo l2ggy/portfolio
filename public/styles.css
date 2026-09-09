@@ -763,11 +763,16 @@ body.is-globe-dragging * {
   25%, 44% { opacity: .3; transform: translateX(-8px); }
   45%, 60% { opacity: .1; transform: translateX(-3px); }
 }
-.life-board { z-index: 1; pointer-events: none; }
-.life-board.is-living { opacity: 1; }
-.life-board.is-living rect { transition: fill 140ms ease; }
+.life-board { pointer-events: none; }
+.hero-heatmap text { fill: #767676; font: 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+.hero-heatmap .day-label { font-size: 9px; }
 .life-board rect { fill: #eee; }
-.life-board .is-alive { fill: var(--heatmap-accent); }
+.life-board [data-score="1"] { fill: rgb(from var(--heatmap-accent) calc(r + 77) calc(g + 77) calc(b + 77)); }
+.life-board [data-score="2"] { fill: rgb(from var(--heatmap-accent) calc(r + 51) calc(g + 51) calc(b + 51)); }
+.life-board [data-score="3"] { fill: var(--heatmap-accent); }
+.life-board [data-score="4"] { fill: color-mix(in srgb, var(--heatmap-accent) 80%, black); }
+.life-board.is-living rect { fill: #eee; transition: fill 140ms ease; }
+.life-board.is-living .is-alive { fill: var(--heatmap-accent); }
 .hero-heatmap-wrap[role="button"] { cursor: pointer; }
 .hero-heatmap-wrap[role="button"]:focus-visible { outline: 1px solid var(--muted); outline-offset: 4px; }
 .tiny-race-line { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; }

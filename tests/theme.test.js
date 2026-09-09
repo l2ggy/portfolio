@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { initEntryInteractions, initHeatmapAccent, setupTheme } from "../public/js/theme.js";
+import { initEntryInteractions, setupTheme } from "../public/js/theme.js";
 
 test("switching light/dark mode preserves the selected brand", (t) => {
   const root = { dataset: {}, classList: { add() {} } };
@@ -75,64 +75,4 @@ test("entry selection toggles, switches, and clears with matching pressed states
   select(null);
   assert.ok(entries.every((entry) => !entry.active && entry.pressed === "false"));
   assert.equal(selectedBrand, null);
-});
-
-test("heatmap fades reuse layers, ignore stale loads, and retry failed loads", (t) => {
-  let accent = "#1e3765";
-  let sync;
-  const images = [];
-  const wrap = { append(image) { image.isConnected = true; } };
-  const makeImage = () => {
-    const image = {
-      src: "https://ghchart.rshah.org/1E3765/l2ggy",
-      parentElement: wrap,
-      active: false,
-      isConnected: false,
-      cloneNode: makeImage,
-      removeAttribute() {},
-      getBoundingClientRect() {},
-    };
-    image.classList = {
-      remove() { image.active = false; },
-      toggle(_, active) { image.active = active; },
-    };
-    images.push(image);
-    return image;
-  };
-  const original = makeImage();
-  original.isConnected = original.active = true;
-  globalThis.document = { documentElement: {}, querySelector: () => original };
-  globalThis.getComputedStyle = () => ({ getPropertyValue: () => accent });
-  globalThis.MutationObserver = class {
-    constructor(callback) { sync = callback; }
-    observe() {}
-  };
-  t.after(() => {
-    delete globalThis.document;
-    delete globalThis.getComputedStyle;
-    delete globalThis.MutationObserver;
-  });
-  initHeatmapAccent();
-  accent = "#663d00";
-  sync();
-  const amazon = images.at(-1);
-  accent = "#490043";
-  sync();
-  const helmholtz = images.at(-1);
-  amazon.onload();
-  assert.equal(amazon.active, false, "a late image must not replace the selected theme");
-  helmholtz.onerror();
-  assert.equal(original.active, true, "keep the previous chart visible on failure");
-  sync();
-  const retry = images.at(-1);
-  assert.notEqual(retry, helmholtz);
-  retry.onload();
-  assert.equal(retry.active, true);
-  accent = "#663d00";
-  sync();
-  assert.equal(amazon.active, true);
-  accent = "#1e3765";
-  sync();
-  assert.equal(original.active, true);
-  assert.equal(images.length, 4, "revisiting a loaded theme must reuse its image");
 });

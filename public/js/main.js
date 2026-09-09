@@ -1,9 +1,9 @@
 import { splitHeroNameLetters } from "./hero-name.js";
 import { setupInteractiveGlobe } from "./interactive-globe.js?v=20260904-2";
 import { setupDetails } from "./easter-eggs/details.js?v=20260904";
-import { setupStatsEggs } from "./easter-eggs/stats.js?v=20260908-2";
+import { setupStatsEggs } from "./easter-eggs/stats.js?v=20260909-3";
 import { setupStats } from "./stats.js";
-import { initEntryInteractions, initHeatmapAccent, setupTheme } from "./theme.js";
+import { initEntryInteractions, setupTheme } from "./theme.js?v=20260909";
 
 const initMobileGlobePlacement = () => {
   const media = window.matchMedia("(max-width: 700px)");
@@ -58,7 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   splitHeroNameLetters();
   initEntryInteractions(setColorScheme);
-  initHeatmapAccent();
   setupStats();
   initMobileGlobePlacement();
   setupDetails();
