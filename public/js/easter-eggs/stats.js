@@ -120,17 +120,17 @@ function setupLife() {
   } catch {
     // Invalid or unavailable storage must not prevent a fresh load.
   }
+  if (!board) showSnapshot(placeholder.outerHTML);
 
   function reset() {
     loading?.abort();
     loading = null;
     clearTimeout(timer);
     generation = 0;
-    board?.svg.classList.remove("is-living");
+    board.svg.classList.remove("is-living");
     wrap.setAttribute("aria-label", label);
     wrap.setAttribute("aria-pressed", "false");
-    wrap.removeAttribute("aria-busy");
-    if (board && snapshotDay !== today()) prepare();
+    if (snapshotDay !== today()) prepare();
   }
   function step() {
     cells = nextGeneration(cells, board.width, board.height);
@@ -144,7 +144,7 @@ function setupLife() {
   }
   async function prepare() {
     if (loading || generation || document.hidden) return;
-    if (!board || snapshotDay !== today()) {
+    if (snapshotDay !== today()) {
       const controller = new AbortController();
       const requestedDay = today();
       loading = controller;
@@ -158,31 +158,18 @@ function setupLife() {
         snapshotDay = requestedDay;
         try { localStorage.setItem(snapshotKey, source); } catch { /* Storage is optional. */ }
       } catch {
-        // Keep the previous snapshot usable and let the next interaction retry.
-        if (!board && loading === controller) {
-          placeholder.querySelector("text").textContent = "Contributions unavailable · click to retry";
-        }
+        // Keep the displayed snapshot usable and let the next interaction retry.
         return;
       } finally {
         clearTimeout(timeout);
         if (loading === controller) {
           loading = null;
-          if (!board) wrap.removeAttribute("aria-busy");
         }
       }
     }
-    if (wrap.hasAttribute("aria-busy")) {
-      wrap.removeAttribute("aria-busy");
-      activate();
-    }
   }
   function activate() {
-    if (generation || wrap.hasAttribute("aria-busy")) { reset(); return; }
-    if (!board) {
-      wrap.setAttribute("aria-busy", "true");
-      prepare();
-      return;
-    }
+    if (generation) { reset(); return; }
     // Play the displayed snapshot, including while its replacement is loading.
     loading?.abort();
     loading = null;

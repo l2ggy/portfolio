@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { setImmediate } from "node:timers/promises";
 import { nextGeneration, raceWpm, ghostPosition, setupStatsEggs } from "../public/js/easter-eggs/stats.js";
 
@@ -65,7 +66,7 @@ test("heatmap and Life share a snapshot across activation, rollover, cancellatio
   }
   const setup = () => {
     wrap = element();
-    image = element();
+    image = Object.assign(element(), { outerHTML: "<svg bundled/>" });
     wrap.append(image);
     setupStatsEggs();
   };
@@ -121,25 +122,20 @@ test("heatmap and Life share a snapshot across activation, rollover, cancellatio
   assert.equal(wrap.children[0], nextSnapshot, "a failed refresh preserves the complete snapshot");
 
   setup();
-  click();
-  assert.equal(requests.length, 5, "click shares the in-flight preload");
-  await respond();
-  assert.equal(wrap.getAttribute("aria-pressed"), "true");
-  click();
-
-  setup();
-  click();
+  const bundled = wrap.children[0];
+  assert.notEqual(bundled, image, "the bundled snapshot is ready before the first network response");
   click();
   assert.equal(requests.at(-1).signal.aborted, true);
+  assert.equal(wrap.getAttribute("aria-pressed"), "true", "first-time visitors can play immediately");
   await respond();
-  assert.equal(wrap.children[0], image, "cancelled preparation cannot start later");
+  assert.equal(wrap.children[0], bundled, "a late response cannot replace the running bundled snapshot");
   click();
   await respond(502);
-  assert.equal(wrap.hasAttribute("aria-busy"), false);
+  assert.equal(wrap.children[0], bundled, "a failed first refresh leaves the bundled chart usable");
+  click();
+  assert.equal(wrap.getAttribute("aria-pressed"), "true");
   click();
   await respond();
-  assert.equal(wrap.getAttribute("aria-pressed"), "true", "failures remain retryable");
-  click();
 
   restoreSaved = true;
   assert.equal(saved, "<svg/>", "persist the last successfully validated snapshot");
@@ -156,11 +152,12 @@ test("heatmap and Life share a snapshot across activation, rollover, cancellatio
 
   saved = "corrupt";
   setup();
-  assert.equal(wrap.children[0], image, "invalid saved data is never rendered");
+  assert.notEqual(wrap.children[0], image, "invalid saved data falls back to the bundled chart");
   await respond();
   assert.notEqual(wrap.children[0], image);
   storageBlocked = true;
   setup();
+  assert.notEqual(wrap.children[0], image, "blocked storage does not delay the bundled chart");
   await respond();
   assert.notEqual(wrap.children[0], image, "storage errors cannot prevent the live chart from loading");
 });
@@ -187,4 +184,14 @@ test("race scoring uses correct characters and elapsed time; ghost stops at sent
   assert.equal(ghostPosition(6_000, 120, 100), 60);
   assert.equal(ghostPosition(60_000, 120, 100), 100);
   assert.equal(ghostPosition(-1, 120, 100), 0);
+});
+
+test("the first HTML response includes a complete contribution chart without JavaScript or API access", () => {
+  const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+  const svg = html.match(/<svg[^>]+id="github-heatmap"[\s\S]*?<\/svg>/)?.[0];
+  assert.ok(svg);
+  assert.match(svg, /width="663" height="104"/);
+  assert.ok((svg.match(/<rect /g) || []).length >= 300);
+  assert.equal((svg.match(/data-score=/g) || []).length, (svg.match(/data-date=/g) || []).length);
+  assert.doesNotMatch(svg, /Loading|<script|<image|\son\w+=/);
 });
