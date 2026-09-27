@@ -124,6 +124,8 @@ a,
 button {
   color: inherit;
   text-decoration: none;
+  /* Follow the parent's animated color without starting another transition. */
+  transition-property: background-color, border-color, outline-color, fill, stroke;
 }
 
 button {
@@ -607,6 +609,7 @@ body.is-globe-dragging * {
 
 .project-title-link {
   position: relative;
+  color: var(--text);
   text-decoration: none;
   transition: color var(--theme-duration) ease, transform 180ms ease;
 }
