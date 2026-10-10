@@ -748,6 +748,10 @@ body.is-globe-dragging * {
 }
 
 /* Hidden interactions use the existing page elements. */
+.footer-runner-year { cursor: default; user-select: none; touch-action: manipulation; }
+.footer-runner { display: block; color: inherit; cursor: pointer; touch-action: manipulation; outline: none; }
+.footer-runner-year:focus-visible,
+.footer-runner.is-keyboard:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
 .maple-away { opacity: 0; }
 .maple-flight { position: fixed; z-index: 25; pointer-events: none; font-size: .84rem; line-height: 1.55; }
 .laggy-letter { position: relative; display: inline-block; }
