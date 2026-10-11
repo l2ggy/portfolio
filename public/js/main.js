@@ -4,7 +4,7 @@ import { setupDetails } from "./easter-eggs/details.js?v=20260904";
 import { setupStatsEggs } from "./easter-eggs/stats.js?v=20260909-4";
 import setupFooterRunner from "./easter-eggs/footer-runner.js?v=20261010";
 import { setupStats } from "./stats.js";
-import { initEntryInteractions, setupTheme } from "./theme.js?v=20260909";
+import { initEntryInteractions, setupTheme } from "./theme.js?v=20261010-burgundy";
 
 const initMobileGlobePlacement = () => {
   const media = window.matchMedia("(max-width: 700px)");

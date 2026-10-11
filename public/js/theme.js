@@ -1,4 +1,5 @@
 const storedThemeKey = "portfolio-theme-override";
+const storedBurgundyKey = "portfolio-burgundy";
 
 export const initEntryInteractions = (setColorScheme) => {
   const tapIndentationQuery = window.matchMedia("(hover: none)");
@@ -27,6 +28,31 @@ export const setupTheme = () => {
   const root = document.documentElement;
   const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
   let overrideTheme = localStorage.getItem(storedThemeKey);
+  let burgundyEnabled = localStorage.getItem(storedBurgundyKey) === "true";
+  let nameClicks = 0;
+
+  const setColorScheme = (colorScheme) => {
+    const scheme = colorScheme || (burgundyEnabled ? "burgundy" : null);
+    if (scheme) {
+      root.dataset.colorScheme = scheme;
+    } else {
+      delete root.dataset.colorScheme;
+    }
+  };
+
+  setColorScheme(null);
+  document.querySelector(".logo-slot")?.addEventListener("click", () => {
+    nameClicks += 1;
+    if (nameClicks < 10) return;
+    nameClicks = 0;
+    burgundyEnabled = !burgundyEnabled;
+    if (burgundyEnabled) {
+      localStorage.setItem(storedBurgundyKey, "true");
+    } else {
+      localStorage.removeItem(storedBurgundyKey);
+    }
+    setColorScheme(null);
+  });
 
   const getSystemTheme = () => (systemThemeQuery.matches ? "dark" : "light");
 
@@ -69,11 +95,5 @@ export const setupTheme = () => {
     }
   });
 
-  return (colorScheme) => {
-    if (colorScheme) {
-      root.dataset.colorScheme = colorScheme;
-    } else {
-      delete root.dataset.colorScheme;
-    }
-  };
+  return setColorScheme;
 };

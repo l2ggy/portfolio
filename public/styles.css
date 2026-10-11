@@ -96,6 +96,37 @@
   --accent: #69005f;
 }
 
+:root[data-color-scheme="burgundy"] {
+  --bar-bg: #500d22;
+  --bar-line: #b95774;
+}
+
+:root[data-theme="dark"][data-color-scheme="burgundy"] {
+  --bg: #1c0b11;
+  --text: #dacdd0;
+  --muted: #ad939b;
+  --line: #42202b;
+  --accent: #c27a90;
+  --bar-bg: #340b19;
+  --bar-text: var(--muted);
+  --bar-active: var(--text);
+  --bar-line: #512331;
+  --heatmap-accent: #800020;
+  --heatmap-empty: #2b1720;
+  --heatmap-low: #47121e;
+  --heatmap-mid: #68182b;
+  --heatmap-high: #a74359;
+}
+
+:root[data-theme="light"][data-color-scheme="burgundy"] {
+  --bg: #fbf2f4;
+  --text: #500d22;
+  --muted: #805364;
+  --line: #dec1ca;
+  --accent: #800020;
+  --heatmap-accent: #800020;
+}
+
 :where(:root.is-theme-ready) :where(body, body *, body *::before, body *::after) {
   transition-property: color, background-color, border-color, outline-color, fill, stroke;
   transition-duration: var(--theme-duration);
@@ -773,12 +804,12 @@ body.is-globe-dragging * {
 .life-board { pointer-events: none; }
 .hero-heatmap text { fill: #767676; font: 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
 .hero-heatmap .day-label { font-size: 9px; }
-.life-board rect { fill: #eee; }
-.life-board [data-score="1"] { fill: rgb(from var(--heatmap-accent) calc(r + 77) calc(g + 77) calc(b + 77)); }
-.life-board [data-score="2"] { fill: rgb(from var(--heatmap-accent) calc(r + 51) calc(g + 51) calc(b + 51)); }
+.life-board rect { fill: var(--heatmap-empty, #eee); }
+.life-board [data-score="1"] { fill: var(--heatmap-low, rgb(from var(--heatmap-accent) calc(r + 77) calc(g + 77) calc(b + 77))); }
+.life-board [data-score="2"] { fill: var(--heatmap-mid, rgb(from var(--heatmap-accent) calc(r + 51) calc(g + 51) calc(b + 51))); }
 .life-board [data-score="3"] { fill: var(--heatmap-accent); }
-.life-board [data-score="4"] { fill: color-mix(in srgb, var(--heatmap-accent) 80%, black); }
-.life-board.is-living rect { fill: #eee; transition: fill 140ms ease; }
+.life-board [data-score="4"] { fill: var(--heatmap-high, color-mix(in srgb, var(--heatmap-accent) 80%, black)); }
+.life-board.is-living rect { fill: var(--heatmap-empty, #eee); transition: fill 140ms ease; }
 .life-board.is-living .is-alive { fill: var(--heatmap-accent); }
 .hero-heatmap-wrap[role="button"] { cursor: pointer; }
 .hero-heatmap-wrap[role="button"]:focus-visible { outline: 1px solid var(--muted); outline-offset: 4px; }
